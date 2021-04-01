@@ -1,6 +1,12 @@
+# Fischer-Lynch-Paterson Impossibility result
+
+
+
+[https://dl.acm.org/doi/10.1145/3149.214121](https://dl.acm.org/doi/10.1145/3149.214121)
+
 # Concurrency Control
 
-Optimistic concurrency control with timestamps
+Optimistic concurrency control with timestamps``
 Each object has two timestamps
 Read timestamp is updated when the object is read
 Write timestamp is updated when the object is written
@@ -55,10 +61,9 @@ Earlier ideas on distributed look-ups
 - central coordinator
 - query flooding
   - requests contain Time-To-Live
+- DNS uses hierarchical lookups
 
-DNS, hierarchical lookups.
-
-## distributed hash-tables
+## distributed hash tables
 
 Algorithmic requirement: every node can find the answer
 
@@ -67,7 +72,8 @@ Trade-off between state, maintenance traffic and #-lookups
 Chord
 
 consistent hashing based on a logical circular space
-  # keys / # buckets need to be remapped when a node arrives/leaves
+
+#-keys/#-buckets need to be remapped when a node arrives/leaves
 
 To create N replicas, store each key-value at N-1 successor nodes
 
@@ -78,8 +84,11 @@ To have good load balance, represent each bucket by log(N) virtual buckets. (Why
 
 Data replicated on N hosts. Key is assigned to a coordinator node (via hashing) who is in charge of replication.
 
-Routing table size: Log N, Routing time: O(log N) hops, because each hop expects to half the distance
+a node is assigned random values in the hash space and to multiple points in the ring (virtual node)
 
+virtual nodes help balanced load distribution
+
+Routing table size: Log N, Routing time: O(log N) hops, because each hop expects to half the distance
 
 Other topologies than finger tables:
 
@@ -93,28 +102,26 @@ The ring geometry allows the greatest flexibility, and hence archives the best r
 #-neighbours: Hypercube 1, Chord&tree: 2^i (what are neighbours about?)
 #-forwarding: tree 1, hypercube N/2, ring Log N
 
-Many services (like Google) are scaling to huge #s without DHT like log(N) techniques, but with direct routing where everyone knows full routing tables. One-hop routing with sqrt(N) state instead of log(N) state.
+Many services (like Google) are scaling to huge #s without DHT like log(N) techniques, but with direct routing where everyone knows full routing tables.
+One-hop routing with sqrt(N) state instead of log(N) state.
 
-Amazon Dynamo
+### Amazon Dynamo
 
-Use weaker consistency
+- incremental scalability, decentralization, heterogenecity (mix of slow and fast systems)
 
-incremental scalability, decentralization, heterogeneity (mix of slow and fast systems)
+- always writable data store (even during network partitions)
 
-always writable data store (even during network partitions)
+- use weaker consistency
 
-may have conflicting changes thathave to be resolved during reads by applications
+- may have conflicting changes that have to be resolved during reads by applications
 
-use a logical ring
+- Not all updates may arrive at all replicas. Data is versioned, using vector clocks.
 
-a node is assigned random values in the hash space and to multiple points in the ring (virtual node)
+  If a node was unreachable, the replica is sent to another node in the ring.
+  Metadata about the original desired destination is sent with the data.
+  Periodically, a node checks if the original targeted node is alive.
 
-virtual nodes help balanced load distribution
-
-Not all updates may arrive at all replicas. Data is versioned, using vector clocks.
-
-If a node was unreachable, the replica is sentn to another node in the ring. Metadata about the original desired destination sent with the data. Periodically, a node checks if the original targeted node is alive.
-
+- use a logical ring
 
 # References
 
