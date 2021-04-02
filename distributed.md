@@ -1,6 +1,41 @@
 # Fischer-Lynch-Paterson Impossibility result
 
+The paper proves that any consensus protocol that tolarates one process failure
+under the reliable asyhchronous message system, in which all messages are eventually delivered with arbitrary delay, fails to reach consensus under some circumstances.
 
+The paper proves the statement (quite elegantly) by showing, for any given protocol, circumstances in which the protocol remains forever indecisive.
+
+## Details
+
+Assume that the message system is reliable -- it delivers all messages correctly and exactly once.
+
+An atomic broadcast capability is assumed, so a process can send the same message in one step to all other processes.
+
+Crucial to the proof: Processing is completely asynchronous: no assumption about the relative speeds of processes or the delay time in delivering messages.
+Processes do not have access to synchronized clocks, hence algorithms based on time-out cannot be used.
+Processes cannot detect the death of a process, they cannot tell if another has died or is running very slowly.
+
+Every process starts with an initial value in {0, 1}.
+A process decides on a value in {0, 1} by entering an appropriate decision state.
+All processes that makes a decision are required to choose the same value.
+Some process must eventually make a decision.
+Both 0 and 1 must be possible decision values (perhaps for different initial configurations.)
+The last requirement is to eliminate the trivial solution, in which, say, 0 is always chosen.
+
+A configuration reachable from some initial state is said to be accessible.
+
+A consensus protocol is partially correct if
+
+1) No accessible configuration has more than one decision value.
+2) For each v in {0, 1}, some accessible configuration has decision value v.
+
+A run is admissible if at most one process is faulty and all messages sent to nonfaulty processes are eventually received.
+
+A run is deciding if some process reaches a decision state.
+
+Main result: 
+
+Proof:
 
 [https://dl.acm.org/doi/10.1145/3149.214121](https://dl.acm.org/doi/10.1145/3149.214121)
 
@@ -97,7 +132,7 @@ Other topologies than finger tables:
 - Hypercubes (CAN)
   Maintains pointers to a neighbour who differs in one bit position. Only one possible neighbour in each direction. Route to reciever by changing any bit.
 
-The ring geometry allows the greatest flexibility, and hence archives the best resilience and proximity performance.
+The ring geometry allows the greatest flexibility, and hence archives the best resilience and proximity performance. (Cf. [The impact of DHT routing geometry on resilience and proximity](https://dl.acm.org/doi/10.1145/863955.863998))
 
 #-neighbours: Hypercube 1, Chord&tree: 2^i (what are neighbours about?)
 #-forwarding: tree 1, hypercube N/2, ring Log N
@@ -131,7 +166,5 @@ http://www.cs.cmu.edu/~dga/15-744/S07/lectures/16-dht.pdf
 
 https://www.cs.rutgers.edu/~pxk/417/index.html
 
-The impact of DHT routing geometry on resilience and proximity.
-https://dl.acm.org/doi/10.1145/863955.863998
 
 https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-033-computer-system-engineering-spring-2018/
