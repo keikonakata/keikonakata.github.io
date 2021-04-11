@@ -1,43 +1,98 @@
-# Fischer-Lynch-Paterson Impossibility result
+# Google File System
 
-The paper proves that any consensus protocol that tolarates one process failure
-under the reliable asyhchronous message system, in which all messages are eventually delivered with arbitrary delay, fails to reach consensus under some circumstances.
+Fault-tolerant scalable distributed file system for large data-intensive applications
 
-The paper proves the statement (quite elegantly) by showing, for any given protocol, circumstances in which the protocol remains forever indecisive.
+Delivers high performance to a large number of clients
 
-## Details
+Design assumptions
 
-Assume that the message system is reliable -- it delivers all messages correctly and exactly once.
+- File access:
+  - Most files are appended, not overwritten
+    - Random writes within a file are almost never done
+    - Once created, files are mostly read, often sequentially
+  - Workload is mostly
+    - Large streaming reads, small random reads
+    - Large appends
+    - Hundreds of processes may append to a file concurrently
+- GFS stores a few million of files
+- Assume apps can handle a relaxed consistency model
 
-An atomic broadcast capability is assumed, so a process can send the same message in one step to all other processes.
+1. Use separate servers to store metadata
+   - Metadata includes lists of (server, block_number) sets that identify which blocks on which servers hold file data
+   - More bandwidth for data access necessary than metadata access
+     - Metadata is small; file data can be huge
+1. Use large logical blocks
+   - In comparison to "normal" file systems, whose typical block size is 4KB, optimized for small files
+1. Besides basic operations (such as create, open, write),
+   - Snapshot, to create a copy of a file or directory tree at low cost
+   - Append, to  allow multiple clients to append atomically without locking
 
-Crucial to the proof: Processing is completely asynchronous: no assumption about the relative speeds of processes or the delay time in delivering messages.
-Processes do not have access to synchronized clocks, hence algorithms based on time-out cannot be used.
-Processes cannot detect the death of a process, they cannot tell if another has died or is running very slowly.
+GFS servers are implemented in user space using native linux FS
 
-Every process starts with an initial value in {0, 1}.
-A process decides on a value in {0, 1} by entering an appropriate decision state.
-All processes that makes a decision are required to choose the same value.
-Some process must eventually make a decision.
-Both 0 and 1 must be possible decision values (perhaps for different initial configurations.)
-The last requirement is to eliminate the trivial solution, in which, say, 0 is always chosen.
+GFS cluster consists of
+- Multiple chunkservers with fixed-size (default, 64MB) chunks.
+  32-bit checksome with each chunk to detect data corruption.
+  Chunkservers store chunks on local disk as Linux files.
+  Chunks replicated on several servers (typically three replicas).
+- One master (for 1000s of chunkservers), which stores file system metadata and maps files to chunks
+  Master assigns a globally unique 64-bit number to each chunk, when it is created.
 
-A configuration reachable from some initial state is said to be accessible.
+###### References
 
-A consensus protocol is partially correct if
+https://www.cs.rutgers.edu/~pxk/417/notes/pdf/12-dfs-slides.pdf
+(accessed on 6.04.2021)
 
-1) No accessible configuration has more than one decision value.
-2) For each v in {0, 1}, some accessible configuration has decision value v.
+# Google Chubby
 
-A run is admissible if at most one process is faulty and all messages sent to nonfaulty processes are eventually received.
+Distributed lock service + simple fault-tolerant file system
 
-A run is deciding if some process reaches a decision state.
+Interfaces: file access, event notification, file locking
 
-Main result: 
+Used for
+- coarse-grained long-term locks (hours or days, not < sec)
+- store small amount of data associated with a name such as system configuration
+- elect masters
 
-Proof:
+Design priority: availability rather than performance
 
-[https://dl.acm.org/doi/10.1145/3149.214121](https://dl.acm.org/doi/10.1145/3149.214121)
+Chubby has at most one master, elected by a consensus protocol (paxos).
+
+Requests from the client go to the master
+
+Master gets a lease time, and re-run master selection after lease time expires of if the master fails.
+
+When a Chubby node receives a proposal for a new master, it only accepts it if the old master's lease has expired
+
+The client access Chubby via an API. Look up Chubby nodes via DNS. Ask any Chubby node for the master. File system interface.
+
+Each file has name, data, access control list, and lock. (No modification/access time, nor partial reads/writes/ nor symbolic links nor moves)
+
+Every file and directory can act as a reader-writer lock.
+If a client fails, the lock will be unavailable for a lock-delay period (typically 1 minute.)
+
+Chubby locks for leader election and using it to write to a file server.
+- Participant who gets a lock together with a lock sequence count is the master.
+- In each RPC to the server, send the sequence count.
+- During request processing, the server reject packegs with old sequence count.
+
+Chubby client cashing & master replication
+
+At the client
+- Data cached in memory by chubby clients. Cache is maintained by a Chubby lease, which can be invalidated
+- All clients write through to the Chubby master
+
+At the master
+- Writes are propagated via Paxos to all Chubby replicas
+  - Data updated in total order. Replicas remain synchronized
+  - The master replies to clients after the consensus is reached
+- Cache invalidations
+  - Master keeps the list of what each client may be caching
+  - Invalidations sent by the master and are acknowledged by clients
+  - File is then cacheable again
+- Chubby database is backed up to GFS every few hours
+
+https://www.cs.rutgers.edu/~pxk/417/notes/pdf/12-dfs-slides.pdf
+(accessed on 6.04.2021)
 
 # Concurrency Control
 
@@ -88,83 +143,3 @@ Run a consensus algorithm on the commit/abort decision of each participant
 
 Eventual consistency
 If no updates are made to a data item, eventually all accesses to that item will return the last updated value.
-
-# Distributed Hash Tables
-
-Earlier ideas on distributed look-ups
-
-- central coordinator
-- query flooding
-  - requests contain Time-To-Live
-- DNS uses hierarchical lookups
-
-## distributed hash tables
-
-Algorithmic requirement: every node can find the answer
-
-Trade-off between state, maintenance traffic and #-lookups
-
-Chord
-
-consistent hashing based on a logical circular space
-
-#-keys/#-buckets need to be remapped when a node arrives/leaves
-
-To create N replicas, store each key-value at N-1 successor nodes
-
-Have all nodes know about each other O(1) look up vs finger tables O(log N) look up
-  finger tables - i-th entry in finger table identify the first node that succeeds or equals to n+2^i
-
-To have good load balance, represent each bucket by log(N) virtual buckets. (Why log(N)?)
-
-Data replicated on N hosts. Key is assigned to a coordinator node (via hashing) who is in charge of replication.
-
-a node is assigned random values in the hash space and to multiple points in the ring (virtual node)
-
-virtual nodes help balanced load distribution
-
-Routing table size: Log N, Routing time: O(log N) hops, because each hop expects to half the distance
-
-Other topologies than finger tables:
-
-- tree-like structures (Pastry, Tapestry, Kademlia)
-
-- Hypercubes (CAN)
-  Maintains pointers to a neighbour who differs in one bit position. Only one possible neighbour in each direction. Route to reciever by changing any bit.
-
-The ring geometry allows the greatest flexibility, and hence archives the best resilience and proximity performance. (Cf. [The impact of DHT routing geometry on resilience and proximity](https://dl.acm.org/doi/10.1145/863955.863998))
-
-#-neighbours: Hypercube 1, Chord&tree: 2^i (what are neighbours about?)
-#-forwarding: tree 1, hypercube N/2, ring Log N
-
-Many services (like Google) are scaling to huge #s without DHT like log(N) techniques, but with direct routing where everyone knows full routing tables.
-One-hop routing with sqrt(N) state instead of log(N) state.
-
-### Amazon Dynamo
-
-- incremental scalability, decentralization, heterogenecity (mix of slow and fast systems)
-
-- always writable data store (even during network partitions)
-
-- use weaker consistency
-
-- may have conflicting changes that have to be resolved during reads by applications
-
-- Not all updates may arrive at all replicas. Data is versioned, using vector clocks.
-
-  If a node was unreachable, the replica is sent to another node in the ring.
-  Metadata about the original desired destination is sent with the data.
-  Periodically, a node checks if the original targeted node is alive.
-
-- use a logical ring
-
-# References
-
-https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-852j-distributed-algorithms-fall-2009/
-
-http://www.cs.cmu.edu/~dga/15-744/S07/lectures/16-dht.pdf
-
-https://www.cs.rutgers.edu/~pxk/417/index.html
-
-
-https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-033-computer-system-engineering-spring-2018/
