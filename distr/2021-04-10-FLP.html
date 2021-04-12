@@ -32,34 +32,33 @@ Some process must eventually make a decision.
 Both 0 and 1 must be possible decision values (perhaps for different initial configurations.)
 -->
 <p>A <em>configuration</em> is a state of the system, which consists of states of all the processes and a state of the message system. <em>Accessible</em> configurations are configurations that are reachable from an initial state.</p>
+<p>A <em>step</em> (p,m) takes one configuration to another, and consists of a single process p receiving a message m (from the message system, which may send the special “no-message” message), entering a new state and sending a finite set of messages to other processes (via the message system).</p>
+<p>A process is nonfaulty if it takes infinitely many steps, and it is faulty otherwise.</p>
 <p>A process decides on a value in {0, 1}, and decision cannot be changed or reversed.</p>
+<p>A <em>run</em> is a finite or infinite sequence of steps. A run is <em>admissible</em> if at most one process is faulty and all messages sent to nonfaulty processes are eventually received (with arbitrary delay and possibly out of order). Therefore, we assume the message system is reliable – it delivers all messages correctly and exactly once. Moreover, an atomic broadcast capability is assumed – a process can send the same message in one step to all other processes.</p>
+<p>A run is <em>deciding</em> if some process reaches a decision state.</p>
 <p>A consensus protocol is <em>partially correct</em> if</p>
 <ol type="1">
 <li>No accessible configuration has more than one decision value.</li>
 <li>For each v in {0, 1}, some accessible configuration has decision value v. (This is to eliminate the trivial solution, in which, say, 0 is always chosen.)</li>
 </ol>
-<!--
-A process is nonfaulty if it takes infinitely many steps, and it is faulty otherwise.
--->
-<p>A run is <em>admissible</em> if at most one process is faulty and all messages sent to nonfaulty processes are eventually received (with arbitrary delay and possibly out of order). Therefore, we assume the message system is reliable – it delivers all messages correctly and exactly once. Moreover, an atomic broadcast capability is assumed – a process can send the same message in one step to all other processes.</p>
-<p>A run is <em>deciding</em> if some process reaches a decision state.</p>
 <h2 id="main-result">Main result</h2>
-<p><strong>Any partially correct consensus protocol admits an admissible run which is not deciding.</strong></p>
+<p><strong>Any partially correct consensus protocol admits an (infinite) admissible run which is not deciding.</strong></p>
 <h3 id="proof">Proof</h3>
 <p>By contradiction: assume a partially correct consensus protocol, for which every run is deciding.</p>
-<p>A configuration C is <em>bivalent</em> if, for i = 0, 1, i-decided configuration is reachable from an initial configuration. A configuration is <em>0-valent</em> (resp. <em>1-valent</em>) if any decided configuration reachable from an initial state has decided on 0 (resp. 1). A configuration is <em>univalent</em> if it is either 0-valent or 1-valent.</p>
-<p>The crux is to prove a lemma, which states, for any bivalent configuration C and any step (p, m) that is applicable to C, there is a run from C to a bivalent configuration, whose last step is (p,m).</p>
-<p>From this lemma, it is easy to construct an admissible run which is not deciding, by sending all messages eventually staying in bivalent configurations.</p>
+<p>A configuration C is <em>bivalent</em> if, for i = 0, 1, i-decided configuration is reachable from an initial configuration. A configuration is <em>0-valent</em> (resp. <em>1-valent</em>) if any decided configuration reachable from an initial state has decided on 0 (resp. 1). By definition, a 0-decided (resp. 1-decided) configuration is 0-valent (resp. 1-valent). A configuration is <em>univalent</em> if it is either 0-valent or 1-valent.</p>
+<p>The crux is to prove a lemma, which states that, for any bivalent configuration C and any step (p, m) that is applicable to C, there is a run from C to a bivalent configuration, whose last step is (p,m).</p>
+<p>By repeatedly applying this lemma, we can construct an (infinite) admissible run which is not deciding, by sending out every message eventually while staying bivalent.</p>
 <h5 id="proof-of-the-lemma.">Proof of the lemma.</h5>
-<p>Let S be the set of configurations reachable from C and whose last step is (p,m).</p>
-<p>Assume S only contains univalent configurations.</p>
+<p>Let S be the set of configurations reachable from C by (finite) runs whose last step is (p,m).</p>
+<p>We prove by contradiction that S contains a bivalent configuration. So, assume S only contains univalent configurations.</p>
 <p>Since C is bivalent, S must contain both 0-valent and 1-valent configurations.</p>
 <p>Without the loss of generality, we assume (p,m)(C) is 0-valent.</p>
-<p>By induction, we obtain configuration C₀ such that (p,m)(C₀) is 0-valent and (p,m)(p’,m’)(C₀) is 1-valent for some (p’,m’).</p>
-<p>If p is not p’, then (p’,m’)(p,m)(C₀) = (p’,m’)(p,m)(C₀). Contradiction. (0-valent configuration cannot be 1-valent at the same time.)</p>
-<p>Assume p = p’.</p>
-<p>Consider any deciding run from C₀ in which p takes no steps, and let σ be the corresponding schedule.</p>
-<p>By our assumption, (p,m)σ(C₀) = σ(p,m)(C₀) is 0-valent, σ(p,m)(p,m’)(C₀) = (p,m)(p, m’)σ(C₀) is 1-valent.</p>
+<p>By induction, we obtain a configuration C₀ such that (p,m)(C₀) is 0-valent and (p,m)(p’,m’)(C₀) is 1-valent for some (p’,m’).</p>
+<p>If p != p’, then (p’,m’)(p,m)(C₀) = (p,m)(p’,m’)(C₀). Contradiction, since a 0-valent configuration cannot be a 1-valent at the same time.</p>
+<p>So, assume p = p’.</p>
+<p>Consider any (finite) deciding run σ from C₀ in which p takes no steps.</p>
+<p>By our assumption, (p,m)σ(C₀) = σ(p,m)(C₀) is 0-valent, but (p,m)(p, m’)σ(C₀) = σ(p,m)(p’,m’)(C₀) is 1-valent.</p>
 <p>However, since σ is a deciding run, σ(C₀) must be univalent. Contradiction. ∎</p>
 <h5 id="references">References</h5>
 <p><a href="https://dl.acm.org/doi/10.1145/3149.214121">Impossibility of Distributed Consensus with One Faulty Process</a></p>

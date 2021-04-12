@@ -34,8 +34,15 @@ GFS cluster consists of
   32-bit checksome with each chunk to detect data corruption.
   Chunkservers store chunks on local disk as Linux files.
   Chunks replicated on several servers (typically three replicas).
-- One master (for 1000s of chunkservers), which stores file system metadata and maps files to chunks
-  Master assigns a globally unique 64-bit number to each chunk, when it is created.
+- One master (for 1000s of chunkservers),
+  - stores file system metadata, such as access control info, mappings from files to chunks, and current locations of chunks.
+    (Master does not store chunk locations persistently, but queries chunk servers.)
+  - manages leases, frees unused chunks and copy/move chunks
+  - All operations on master are logged and persisted on the disk, with periodic checkpoints stored in a B-tree.
+  - Master assigns a globally unique 64-bit number to each chunk, when it is created.
+
+GFS clients interact with master for metadata-related operations.
+They interacts directly with chunkservers for file data. (All reads and writes go directly to chunkservers.)
 
 ###### References
 
