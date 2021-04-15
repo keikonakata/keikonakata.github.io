@@ -40,9 +40,34 @@ GFS cluster consists of
   - manages leases, frees unused chunks and copy/move chunks
   - All operations on master are logged and persisted on the disk, with periodic checkpoints stored in a B-tree.
   - Master assigns a globally unique 64-bit number to each chunk, when it is created.
+  - Master periodically communicate with all chunkservers via heartbeat messages
 
 GFS clients interact with master for metadata-related operations.
 They interacts directly with chunkservers for file data. (All reads and writes go directly to chunkservers.)
+
+Large chunk size, default 64MB, in comparison to Linux ext4 block sizes, typically 4KB and up to 1MB.
+Large chunk makes it feasible to keep a TCP connection open to a chunkserver for an extended time. (Why?)
+
+Reading files: contact the master, get the metadata, including the locations of chunks, contact any available chunkserver.
+
+Writing
+- Master grants a chunk lease to one of the replicas. This replica will be the primary chunk server, which can request lease extensions if needed. Master increases the chunk version number and informs replicas.
+
+Write in two phases.
+- Phase 1: A client is given a list of replicas and it identifies the primary and secondaries. The client writes to the closest replica chunkserver, which further forwards the data to anothe replica chunkserver,.... Maximize bandwidth via pipelining.
+Chunkservers store the received data in a cache.
+Order does not matter at the phase 1.
+
+- Phase 2: The client waits for replicas to acknowledge receiving the data, then sends a write request to the primary, identifying the data that was sent.
+The primary is responsible for serialisation of writes. It assigns consecutive serial numbers to all write it has received. Applies write in the serial number order and forwards write requests in order to secondaries.
+Once all acknowledgements have been received, the primary acknowledges the client.
+At the phase 2, locking is used and order is maintained.
+
+Chunk version numbers are used to detect if any replica has stale data (was not updated because it was down.)
+
+GFS has no per-directory data structure like most file systems.
+Namespace is a single lookup table, mapping pathnames to metadata.
+
 
 ###### References
 

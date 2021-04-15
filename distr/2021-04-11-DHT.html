@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title> Keiko Nakata - Distributed Hash Tables</title>
+  <link href="../css/default.css" type="text/css" rel="stylesheet" />
+</head>
+<body>
+        <header>
+            <nav>
+                <a href="../index.html">Home</a>
+                <a href="../archive.html">Archive</a>
+            </nav>
+        </header>
+
+        <main role="main">
+            <article>
+    <section class="header">
+        <h1>Distributed Hash Tables</h1>
+        Updated on 2021-04-15
+        
+    </section>
+    <section>
+        <p>Earlier ideas on distributed look-ups include</p>
+<ul>
+<li>central coordinator</li>
+<li>query flooding
+<ul>
+<li>requests contain Time-To-Live</li>
+</ul></li>
+<li>DNS uses hierarchical lookups</li>
+</ul>
+<h2 id="distributed-hash-tables">Distributed Hash Tables</h2>
+<p>Algorithmic requirement: every node can find the answer.</p>
+<p>Trade-off between the size of states, the volume of the maintenance traffic and the number of lookups.</p>
+<h3 id="rendezvous-or-highest-random-weight-hashing">Rendezvous (or highest random weight) hashing</h3>
+<p>Each key generates a randomly sorted list of nodes and chooses the first node from the list.</p>
+<p>Concretely,</p>
+<ol type="1">
+<li><p>Hash all possible key-node combinations with a random hash function</p></li>
+<li><p>Assign the key to the node with the largest hash value</p></li>
+</ol>
+<h4 id="advantages">Advantages</h4>
+<ol type="1">
+<li><p>The load of failing server is evenly distributed across the remaining nodes, because each key potentially has a different second-choice node.</p></li>
+<li><p>Each node only has to know the list of node identifiers and the hash function, hence it a requires smaller state size in comparison with consistent hashing.</p></li>
+</ol>
+<h4 id="disadvantages">Disadvantages</h4>
+<ol type="1">
+<li><p>Adding new nodes is hard. (I did not really get why this is the case.)</p></li>
+<li><p>If there are N nodes, the lookup algorithm takes O(N) because all of the key-server combinations have to be examined.</p></li>
+</ol>
+<h3 id="consistent-hashing">Consistent hashing</h3>
+<p>Consistent hashing requires only #-keys/#-nodes be remapped when a node arrives/leaves, based on (logical) circular/ring topology.</p>
+<p>A node is assigned a random value in the hash space and to multiple points in the ring, a.k.a. <em>virtual nodes</em>. Virtual nodes help balance load distribution. To have good load balance, represent each node by log(N) virtual nodes. (Why log(N)?)</p>
+<p>To create N replicas, store each key-value at N-1 successor nodes. A key is assigned to a coordinator node (via hashing) who is in charge of replication.</p>
+<p>Having all nodes know about each other requires O(1) hops and sqrt(N) states. (Why sqrt(N)?) Instead, one can use <em>finger tables</em>. A finger table stores at the i-th entry the first node that succeeds or equal to n+2^i. Hence finger tables require O(log N) hops, because each hop expects to half the distance, and O(log N) states.</p>
+<p>Other topologies than ring includes:</p>
+<ul>
+<li><p>tree-like structures (Pastry, Tapestry, Kademlia)</p></li>
+<li><p>hypercubes (CAN), maintain pointers to neighbors who differ in one bit position. Only one possible neighbor in each direction. Route to the receiver by changing any bit.</p></li>
+</ul>
+<p>The ring geometry allows the greatest flexibility, and hence archives the best resilience and proximity performance. (Cf. <a href="https://dl.acm.org/doi/10.1145/863955.863998">The impact of DHT routing geometry on resilience and proximity</a>)</p>
+<p>Many services (like Google) are scaling to huge numbers without the log(N) techniques, but with direct routing, in which everyone knows full routing tables.</p>
+<h3 id="amazon-dynamo">Amazon Dynamo</h3>
+<p>Dynamo offers always-writable data store (even during network partitions), based on the design principles of incremental scalability, decentralization, heterogenecity (mix of slow and fast systems).</p>
+<p>Dynamo uses consistent-hashing.</p>
+<p>It only guarantees weaker consistency. Not all updates may arrive at all replicas. Data is versioned, using vector clocks. If a node was unreachable, the replica is sent to another node in the ring. Metadata about the original desired destination is sent with the data. Periodically, a node checks if the original targeted node is alive. Conflicting changes have to be resolved during reads by applications</p>
+<h5 id="references">References</h5>
+<p>https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-852j-distributed-algorithms-fall-2009/</p>
+<p>http://www.cs.cmu.edu/~dga/15-744/S07/lectures/16-dht.pdf</p>
+<p>https://www.cs.rutgers.edu/~pxk/417/index.html</p>
+<p>https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-033-computer-system-engineering-spring-2018/</p>
+<p><a href="https://randorithms.com/2020/12/26/rendezvous-hashing.html">Rendezvous Hashing Explained</a></p>
+    </section>
+</article>
+
+        </main>
+
+        <footer>
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </footer>
+    </body>
+</html>
