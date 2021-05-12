@@ -17,21 +17,22 @@
             <article>
     <section class="header">
         <h1>Google Chubby Lock Service</h1>
-        Updated on 2021-05-08
+        Updated on 2021-05-13
         
     </section>
     <section>
-        <p>Distributed lock service, equipped with a simple fault-tolerant file system</p>
-<p>Reliability and availability are the primary goal, throughput and storage capacity are secondary.</p>
-<p>Chubby’s API provides whole-file reads and writes, advisory locks, and notification of events such as file modification.</p>
+        <p>Chubby is a distributed lock service, equipped with a simple fault-tolerant file system. Reliability and availability are the primary goals, throughput and storage capacity are secondary.</p>
+<p>Chubby’s API provides whole-file reads and writes, advisory locks, and notification of events such as file modification. Chubby serves small files to permit elected primaries to advertise themselves and their parameters. It offers an event notification mechanism to avoid polling.</p>
 <p>Chubby is used in GFS and Bigtable, to elect a leader and store a small amount of metadata. Many services at Google that elect a primary or that partition data between their components need a mechanism for advertising the results, via reading and writing small files.</p>
+<p>To elect a master, which writes to a file server, using Chubby, a client acquires a lock to become master and pass an additional integer, the lock acquisition count, to the file server with the write RPC. The file server to reject the write if the acquisition count is lower than the current value (to guard against delayed packets).</p>
+<p>Chubby is intended to provide only coarse-grained locking, in which a primary holds a lock for hours or days (and not &lt; seconds). Coarse-grained locks are acquired only rarely, so temporary lock server unavailability delays clients less. The transfer of a lock from a client to a client may require costly recovery procedure, hence a failover of a lock server should not cause locks to be lost.</p>
 <h2 id="system-structure">System Structure</h2>
 <p>Chubby consists of a server and a library that client applications link against. All communications between the server and Chubby clients are mediated by the client library.</p>
-<p>A Chubby cell consists of replicas, typically five. The replicas elect a master using a distributed consensus protocol. Replicas will not elect a different master for an interval of a few seconds, a.k.a, master lease. Master lease is periodically renewed.</p>
+<p>A Chubby cell consists of replicas, typically five. The replicas elect a master using a distributed consensus protocol. The master gets a lease time, called master lease, which is renewed periodically. Replicas will not elect a different master before the master lease expires.</p>
 <p>One Chubby master handles up to 100,000 clients.</p>
 <p>Replicas maintain copies of a simple database. Only the master initiates reads and writes of the database. All other replicas copy updates from the master, sent using the consensus protocol.</p>
 <p>Clients find the master by sending master location requests to the replicas listed in the DNS. Non-master replicas respond to such requests by returning the identity of the master. Once the master is located, clients direct all requests to the master, either until the master ceases to respond or it indicates that it is no longer the master. Write requests are propagated via the consensus to all replicas. Write requests are acknowledged when the consensus has been reached. Read requests are satisfied by the master alone. This is safe provided the master lease has not expired, as no other master can possibly exist.</p>
-<p>If a master fails, the other replicas run the election protocol when their master leases expire. A new master is typicall elected in a few seconds, but it could be as long as 30 seconds.</p>
+<p>If a master fails, the other replicas run the election protocol when their master leases expire. A new master is typically elected in a few seconds, but it could be as long as 30 seconds.</p>
 <h2 id="file-system">File system</h2>
 <p>Chubby exports a file system client interface, similar to but simpler than that of UNIX.</p>
 <p>Each node, i.e., a file or a directory, has various metadata. The metadata includes names of access control lists, where ACLs are themselves files located in an ACL directory, and 4 monotonically increasing 64-bit numbers that allow clients to detect changes easily:</p>
@@ -42,7 +43,7 @@
 <li><p>ACL generation number, which increases when the node’s ACL names are written</p></li>
 </ul>
 <p>Chubby also exposes a 64-bit file-content checksum, so clients may tell whether files differ.</p>
-<p>Analogous to UNIX file descripters, clients open nodes to obtain handles, which include</p>
+<p>Analogous to UNIX file descriptors, clients open nodes to obtain handles, which include</p>
 <ul>
 <li><p>check digits that prevent clients from creating or guessing handles. Hence full access control checks need be performed only when handles are created.</p></li>
 <li><p>a sequence number that allows a master to tell if a handle was created by it or by a previous master</p></li>
@@ -53,20 +54,22 @@
 <h2 id="lock-and-sequencer-api">Lock and sequencer API</h2>
 <p>Each Chubby file and directory can act as a reader-writer lock, i.e., either in the exclusive mode or the shared mode.</p>
 <p>Locks are advisory. That is, holding a lock called F neither is necessary to access the file F nor prevents others from doing so.</p>
-<p>At any time, a lock holder may request a sequencer, an opacque byte-string that describes the state of the lock immediately after acquisition. It contains the name of the lock, the mode in which it was acquired (shared vs exclusive), the lock generation number.</p>
-<p>If a client releases a lock in the normal way, it is immediately available for other clients to claim. If a lock becomes free because the holder has failed or become inaccessible, the lock server will prevent other clients from claiming the lock for a period called th lock-delay.</p>
+<p>At any time, a lock holder may request a sequencer, an opaque byte-string that describes the state of the lock immediately after acquisition. It contains the name of the lock, the mode in which it was acquired (shared vs exclusive), the lock generation number.</p>
+<p>If a client releases a lock in the normal way, it is immediately available for other clients to claim. If a lock becomes free because the holder has failed or become inaccessible, the lock server will prevent other clients from claiming the lock for a period called the lock-delay.</p>
 <h2 id="events">Events</h2>
 <p>Chubby clients may subscribe to a range of events when they create a handle. These events are delivered to the client asynchronously. They include, file contents modified, Chubby master fail over, etc.</p>
 <h2 id="caching">Caching</h2>
 <p>To reduce read traffic, Chubby clients cache file data and node metadata in a consistent, write-through cache held in memory. The key to scaling Chubby is not server performance. Reducing communication to the server can have far greater impact. Cache is kept consistent by invalidations sent by the master. The master keeps a list of what each client may be caching.</p>
-<p>When file data or metadata is to be changed, the modification is blocked while the master sends invalidations for the data to every clients that may have cached it. On receipt of an invaliation, a client flushes the invalidated state and acknowledges the master. The modification proceeds only after the master knows that each client has invalidated its cache, either because the client acknowledged or the client allowed its cache lease to expire. This mechanism sits on top of KeepAlive RPCs.</p>
+<p>When file data or metadata is to be changed, the modification is blocked while the master sends invalidations for the data to every clients that may have cached it. On receipt of an invalidation, a client flushes the invalidated state and acknowledges the master. The modification proceeds only after the master knows that each client has invalidated its cache, either because the client acknowledged or the client allowed its cache lease to expire. This mechanism sits on top of KeepAlive RPCs.</p>
+<h3 id="use-as-a-name-server">Use as a name server</h3>
+<p>Chubby provides name service for most of Google’s systems, because of its ability to provide swift name updates (in comparison to DNS) without polling each name individually. Chubby’s explicit cache invalidation requires a constant rate of KeepAlive to maintain an arbitrary number of cache entries indefinitely at a client in the absence of changes, whereas DNS entries are discarded when they have not been refreshed within the Time-To-Live period. Consistent client cashing, rather than time-based cashing, frees developers from having to choose a cache timeout.</p>
 <h2 id="sessions-and-keepalives">Sessions and KeepAlives</h2>
 <p>A Chubby session between a Chubby cell and a Chubby client is maintained by periodic handshakes called KeepAlives.</p>
-<p>Each session has an associated lease. The master extends the lease, when it responds to a KeepAlive RPC from the client. On receiving a KeepAlive, the master blocks the RPC (i.e., does not allow it to return) until the client’s previous lease interval is close to expring. The client initiates a new KeepAlive immediately after receiving the previous reply. Thus, the client ensures that there is almost always a KeepAlive call blocked at the master. The KeepAlive reply is used to transmit events and cache invalidations back to the client. In particular, client cannot refresh its session lease without acknowledging cache invalidations.</p>
+<p>Each session has an associated lease. The master extends the lease, when it responds to a KeepAlive RPC from the client. On receiving a KeepAlive, the master blocks the RPC (i.e., does not allow it to return) until the client’s previous lease interval is close to expiring. The client initiates a new KeepAlive immediately after receiving the previous reply. Thus, the client ensures that there is almost always a KeepAlive call blocked at the master. The KeepAlive reply is used to transmit events and cache invalidations back to the client. In particular, client cannot refresh its session lease without acknowledging cache invalidations.</p>
 <p>The master may increase lease time from the default 12s up to around 60s when it is under heavy load, so it need process fewer KeepAlive RPCs.</p>
 <p>Due to TCP’s backoff policies, TCP-based KeepAlives led to many lost sessions at times of high network congestion. Chubby therefore sends KeepAlive RPCs via UDP, which is not ideal either, as UDP has no congestion avoidance mechanisms.</p>
 <h2 id="failovers">Failovers</h2>
-<p>When the master fails or loses its mastership, it discards its in-memory state about sessions, handles and locks. The authoritative timer for session leases runs at master, so until a new master is elected, the session lease timer is stopped, which is equivalent to extending the client’s lease. If a new master is elected quickly, clients can contact the new master before their local approximate lease timers expire. If the election takes longer, clients flush their caches and wait for an interval, called the grace period, while trying to find a new master. The grace period allows sessions to be maintained across failovers that execeed the normal lease timeout.</p>
+<p>When the master fails or loses its mastership, it discards its in-memory state about sessions, handles and locks. The authoritative timer for session leases runs at master, so until a new master is elected, the session lease timer is stopped, which is equivalent to extending the client’s lease. If a new master is elected quickly, clients can contact the new master before their local approximate lease timers expire. If the election takes longer, clients flush their caches and wait for an interval, called the grace period, while trying to find a new master. The grace period allows sessions to be maintained across failovers that exceed the normal lease timeout.</p>
 <p>During the grace period, a client does not tear down its session, but it blocks all application calls on its API to prevent the application from observing inconsistent data.</p>
 <p>Chubby avoids recording sessions in the database at all. Instead, the master recreates sessions in the same way it recreates handles in the event of failovers. Since sessions can be recreated without on-disc state, proxy servers can manage sessions that the master is not aware of. As a result, a new master must wait a full worst-case lease timeout before allowing operations to proceed, since it cannot know whether all sessions have checked-in.</p>
 <h4 id="references">References</h4>
