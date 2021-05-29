@@ -21,7 +21,7 @@
         
     </section>
     <section>
-        <p>The paper presents a technique for implementing samll databases that frequently occor in operating systems and distributed systems design.</p>
+        <p>The paper presents a technique for implementing small databases that frequently occur in operating systems and distributed systems design.</p>
 <h2 id="the-problem">The problem</h2>
 <p>We want to manage data that is structured and must persist across system restart.</p>
 <p>The proposed solution is suitable for databases with the following characteristics:</p>
@@ -41,7 +41,7 @@
 <p>The database is represented as an ordinary data structure in virtual memory. Its counterpart on disk has two components:</p>
 <ul>
 <li><p>a checkpoint of some previous (consistent) state of the entire database, and</p></li>
-<li><p>a log recording each subsequent update to the dataabse.</p></li>
+<li><p>a log recording each subsequent update to the database.</p></li>
 </ul>
 <p>A read access (to the database) consists purely of a lookup in the virtual memory.</p>
 <p>An update is made in three steps, consisting of two virtual memory operations and one disk write:</p>
@@ -53,7 +53,7 @@
 <p>The implementation must use an appropriate locking strategy to serialize updates and to prevent interference between updates and concurrent enquiries.</p>
 <p>From time to time, the implementation</p>
 <ol type="1">
-<li><p>recordes on disk a checkpoint containing the entire contents of the virtual memory datastructure, then</p></li>
+<li><p>records on disk a checkpoint containing the entire contents of the virtual memory data structure, then</p></li>
 <li><p>resets the log to be empty, and</p></li>
 <li><p>removes any previous checkpoint from the disk.</p></li>
 </ol>
