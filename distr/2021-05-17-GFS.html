@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title> Keiko Nakata - The Google File System</title>
+  <link href="../css/default.css" type="text/css" rel="stylesheet" />
+</head>
+<body>
+        <header>
+            <nav>
+                <a href="../index.html">Home</a>
+                <a href="../archive.html">Archive</a>
+            </nav>
+        </header>
+
+        <main role="main">
+            <article>
+    <section class="header">
+        <h1>The Google File System</h1>
+        Updated on 2021-06-25
+        
+    </section>
+    <section>
+        <h2 id="assumptions">Assumptions</h2>
+<ul>
+<li><p>The system is built from many inexpensive commodity components that often fail.</p></li>
+<li><p>The system expects a few million files, each typically 100MB or larger in size. Multi-GB files are a common case.</p></li>
+<li><p>The workloads primary consist of two kinds of reads: large (1MB or more) streaming reads and small (a few KBs) random reads.</p></li>
+<li><p>The workloads have many large, sequential writes that append data to files. Small writes at arbitrary positions in a file are supported but do not have to be efficient.</p></li>
+<li><p>Files are often used as producer-consumer queues or for many-way merging. Hundreds of producers will concurrently append to a file. Atomicity with minimal synchronization overhead is essential.</p></li>
+<li><p>High sustained bandwidth is more important than low latency.</p></li>
+</ul>
+<h2 id="architecture">Architecture</h2>
+<p>A GFS cluster consists of a single master and multiple chunkservers, and is accessed by multiple clients. Having a single master simplifies the design.</p>
+<h3 id="chunks">Chunks</h3>
+<p>Files are divided into fixed-size chunks. Chunk size is 64 MB. A chunk is extended only as needed, allocating space lazily to avoid wasting space due to internal fragmentation. A large chunk size reduces the burden on the master (e.g., fewer interaction between clients and the master.) Each chunk is identified by an globally unique 64 bit chunk handle assigned by the master at the time of chunk creation. Chunkservers store chunks on local disks as plain Linux files. By default, each chunk is replicated on three chunkservers.</p>
+<p>Each chunkserver uses checksumming to detect corruption of stored data. Checksums are kept in memory and stored persistently with logging. Checksums and chunk version numbers are only metadata stored at chunkservers.</p>
+<h3 id="master">Master</h3>
+<p>The master maintains all file system metadata, and executes all namespace operations. It controls system-wide activeties, such as it decides where to place chunks, creates new chunks and replicas, re-replicates and migrates, and garbage collects orphaned chunks, as well as it manages chunk lease. The master periodically communicates with each chunkserver in HearBeat messages to give it instructions and collect its state.</p>
+<p><strong>Metadata.</strong> The master’s metadata includes the file and chunk namespaces, the mapping from files to chunks, and the locations of each chunk’s replicas. All metadata is kept in the master’s memory. The first two are also kept persistent by logging mutations to an operation log. The operation log serves as a logical time line that defines the order of concurrent operations. It is stored on the master’s local disk and replicated on multiple remote machines. The master responds to a client operation only after flushing the corresponding log record to disk both locally and remotely. The master recovers its file system state by replaying the operation log. The master checkpoints its state in a compact B-tree like form.</p>
+<p><strong>Chunk locations.</strong> The master does not keep a persistent record of chunk location information. It polls chunkservers for that information at startup. The master can keep itself up-to-date thereafter because it controls all chunk placement and monitors chunkserver status with regular HeartBeat messages.</p>
+<p><strong>Namespace operations.</strong> GFS allows multiple namespace operations to be active and use locks over regions of the namespace to ensure proper serialization. GFS logically represents its namespace as a lookup table, mapping full pathnames to metadata.</p>
+<p><strong>Chunk version numbers.</strong> For each chunk, the master maintains a chunk version number, to detect any replica that has become stale because it has missed mutations while the chunk server was down. Whenever the master grants a new lease on a chunk, it increases the chunk version number and informs the up-to-date replicas. The master and these replicas all record the new version number in their persistent state. This occurs before any client is notified, and therefore before it can start writing to the chunk.</p>
+<h3 id="clients">Clients</h3>
+<p>GFS client code is linked into each application. It implements a file system API. Clients interact with the master for metadata operations, but all data-bearing communication goes directly to the chunkservers. Clients ask the master which chunkservers they should contact. Clients cache metadata for a limited time and interacts with chunkservers directly for many subsequent operations. Neither client nor chunkserver caches file data.</p>
+<h2 id="system-interactions">System Interactions</h2>
+<p>GFS has a relaxed consistency model. It is designed to minimize the master’s involvement in all operations.</p>
+<p>GFS decouples the flow of data from the flow of control to use the network efficiently. While control flows from the client to the primary and then to all secondaries, data is pushed linearly along a carefully picked chain of chunkservers in a pipeline fashion, to fully utilize each machine’s network bandwidth. (Inter-switch links are often bottlenecks.) Each machine forwards the data to the “closest” machine in the network topology that has not received it. Once a chunkserver receives some data, it starts forwarding immediately over TCP connections. Pipelining is especially helpful to us because we use a switched network with full-duplex links. Sending the data immediately does not reduce the receive rate.</p>
+<h3 id="leases-and-mutation-order">Leases and Mutation Order</h3>
+<p>The master grants a chunk lease to one of the replicas, called the primary. The primary picks a serial order for all mutations to the chunk. All replicas follow this order when applying mutations.</p>
+<ol type="1">
+<li><p>The client asks the master which chunkserver holds the current lease for the chunk and the locations of the other replicas.</p></li>
+<li><p>The client pushes the data to any of the replicas, which is further pushed to other replicas.</p></li>
+<li><p>Once all the replicas have acknowledged receiving the data, the client sends a write request to the primary. The primary assigns consecutive serial numbers to all the mutations it receives, possibly from multiple clients, which provides the necessary serialization. The primary applies the mutation to its own local state in the serial number order.</p></li>
+<li><p>The primary forwards the write request to all secondary replicas. Each secondary replica applies mutations in the same serial number order assigned by the primary.</p></li>
+<li><p>The primary replies to the client, once the secondaries all reply to the primary indicating that they have completed the operations.</p></li>
+</ol>
+<p>Any errors encountered at any of the replicas are reported to the client. In case of errors, the write may have succeeded at the primary and an arbitrary subset of the secondary replicas. The client request is considered to have failed, and the modified region is left in an inconsistent state.</p>
+<p>If a write by the application is large or straddles a chunk boundary, GFS client code breaks it down into multiple write operations. They may be interleaved with and overwritten by concurrent operations from other clients. Therefore, a successful write may leave a shared file region containing fragments from different clients.</p>
+<h3 id="atomic-record-append">Atomic Record Append</h3>
+<p>GFS provides an atomic append operation, called record append. The client specified only the data, and GFS appends it to the file at least once atomically at an offset of GFS’s choosing. Practically all GFS’s client applications mutate file by appending (rather than overwriting.)</p>
+<p>Record append adds a little extra logic at the primary to the write control flow described above. The client pushes the data to all the replicas holding the last chunk of the file, and then sends its request to the primary. The primary checks if appending the record to the current chunk would cause the chunk to exceed the maximum size (64 MB). If so, it pads the chunk to the maximum size, tells secondaries to do the same, and replies to the client indicating that the operation should be retried on the next chunk. If the record fits within the maximum size, the primary appends the data to its replica, tells the secondaries to write the data at the exact offset where it has, and finally replies success to the client. If a record append fails at any replica, the client retries the operation.</p>
+<p>GFS does not guarantee that all replicas are bytewise identical. It only guarantees that the data is written at least once as an atomic unit.</p>
+<h3 id="snapshot">Snapshot</h3>
+<p>The snapshot operation makes a copy of a file or a directory tree almost instantaneously, while minimizing any interruptions of ongoing mutations. GFS uses standard copy-on-write techniques to implement snapshots. When the master receives a snapshot request, it first revokes any outstanding leases. Then the master logs the operation to disk. It then applies this log record to its in-memory state by duplicating the metadata for the source file or directory tree.</p>
+<h2 id="high-availability">High Availability</h2>
+<p>High availability is provided by fast recovery and replication. Both the master and chunkservers are designed to restore their state and start in seconds no matter how they terminated. GFS does not distinguish between normal and abnormal termination.</p>
+<h4 id="references">References</h4>
+<p><a href="https://dl.acm.org/doi/10.1145/1165389.945450">The Google file system (ACM SIGOPS Operating Systems Review 2003)</a></p>
+    </section>
+</article>
+
+        </main>
+
+        <footer>
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </footer>
+    </body>
+</html>
