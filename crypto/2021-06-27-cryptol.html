@@ -21,7 +21,7 @@
         
     </section>
     <section>
-        <h2 id="installation">Installation</h2>
+        <h2 id="installation-note">Installation note</h2>
 <p>On Ubuntu 18.04 x86_64, the downloaded binary <a href="https://github.com/GaloisInc/cryptol/releases/tag/2.11.0">2.11.0</a> fails with</p>
 <pre><code>error while loading shared libraries: libtinfo.so.6: cannot open shared object file: No such file or directory</code></pre>
 <p>Using Docker worked, thanks to <a href="https://github.com/GaloisInc/cryptol/issues/1140#issuecomment-865060989">git comment from weaversa</a>.</p>
@@ -35,6 +35,16 @@ ENTRYPOINT [&quot;/usr/local/bin/cryptol&quot;]</code></pre>
 <pre><code>docker run --rm --name my-cryptol -it my-cryptol</code></pre>
 <p>To start bash in the container:</p>
 <pre><code>docker exec -it my-cryptol bash</code></pre>
+<p><code>[6]</code> is an abbreviation of <code>[6]Bit</code>, meaning a Bit sequence of length 6. Likewise, <code>[4][2]</code> means a sequence of two bit numbers of length 4.</p>
+<pre><code>Cryptol&gt; :t take
+take : {front, back, a} (fin front) =&gt; [front + back]a -&gt; [front]a
+Cryptol&gt; take `{3} 0xFF
+0x7</code></pre>
+<p>Cryptol cannot prove polymorphic properties. The user must tell Cryptol what particular monomorphic instance of the property she would like Cryptol to prove.</p>
+<p>Cryptol’s <code>:prove</code> command is complete. I.e., it will always either prove the property or find a counterexample. It might take infeasible amounts of resources (e.g., memory and time).</p>
+<ul>
+<li><a href="https://github.com/weaversa/cryptol-course">Cryptol Course by weaversa</a></li>
+</ul>
     </section>
 </article>
 
