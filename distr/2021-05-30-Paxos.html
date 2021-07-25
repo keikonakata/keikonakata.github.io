@@ -17,27 +17,30 @@
             <article>
     <section class="header">
         <h1>Paxos</h1>
-        Updated on 2021-07-03
+        Updated on 2021-07-21
         
     </section>
     <section>
-        <p>Paxos is a distributed consensus protocol for (deterministic) state machine replication in an asynchronous environment (i.e., there are no bounds on timing) that admits crash failures.</p>
-<p>Check out my <a href="https://github.com/keikonakata/rustMisc/tree/master/paxos">reference implementation</a> in Rust.</p>
+        <p>Paxos is a distributed consensus protocol for deterministic state machine replication in an asynchronous environment (i.e., there are no bounds on timing) that admits crash failures.</p>
+<p>The discussion below is accompanied by my <a href="https://github.com/keikonakata/rustMisc/tree/master/paxos">reference implementation</a> in Rust.</p>
 <h3 id="safety">Safety</h3>
-<p>Paxos guarantees that, for every slot s, replicas ρ1 ρ2, and command c1 c2, if (s, c1) is in ρ1.decisions and (s, c2) is in ρ2.decisions, then c1 = c2.</p>
-<p>This follows from the following property.</p>
-<p>A-inv: Suppose for each α among a majority of acceptors, (b, s, c) in α.accepted. Then, for any b’ &gt; b and α’, if b’ &gt; b and (b’, s, c’) is in α’.accepted, then c = c’.</p>
-<p>This in turn follows from the following property.</p>
-<p>C-inv: Suppose that for each α among a majority of acceptors, (b, s, c) in α.accepted. If b’ &gt; b and a commander is spawned for (b’, s, c’), then c = c’.</p>
-<p>The crux is the proof of C-inv. It is proved by induction on b’.</p>
+<p>A replica may receive multiple decisions for the same slot. Paxos guarantees that, for any slot s, any decision for s received by any replica contains the same command. Namely, for ∀s: slot, ∀ρ1 ρ2: replica, and ∀c1 c2: command, if (s, c1) is in ρ1.decisions and (s, c2) is in ρ2.decisions, then c1 = c2.</p>
+<p>This follows from the following property of leaders. Suppose that for ∀α:acceptor among a majority of acceptors, (b, s, c) in α.accepted. Then, ∀b b’: ballot, if b’ &gt; b and a commander is spawned for (b’, s, c’) for some c’, then c = c’.</p>
+<p>To understand Paxos, we need to understand the proof of this property. It is proved by induction on b’.</p>
 <p>Suppose a commander is spawned for (b’, s, c’). Hence, a majority of acceptors have adopted b’.</p>
-<p>Suppose there is no pvalue in pvals for s. This contradicts with that a majority of acceptors have accepted b. The condition pval.b &gt;= ballot_num prevents from lower ballot to be accepted once b’ is adapted.</p>
-<p>Let (b’‘, s, c’‘) be the maximum pvalue in pvals. Either b’’ = b or by induction hypothesis. Induction hypothesis, because all pvalues in pvals are &lt; b’.</p>
+<ul>
+<li><p>Suppose the leader did not receive any pvalue for s. This means a majority of acceptors have not and will not accepted b. Contradiction.</p></li>
+<li><p>Let (b’‘, s, c’‘) be the maximum pvalue received. We have c’’ = c’.</p>
+<ul>
+<li>If b’’ = b, then c’’ = c.</li>
+<li>Suppose b’’ &lt; b. Since b’’ &lt; b’, by induction hypothesis, c’’ = c.</li>
+</ul></li>
+</ul>
 <h3 id="termination">Termination</h3>
-<p>Paxos is no exception to the <a href="./2021-04-10-FLP.html">FLP impossibility result</a>, and Paxos does not guarantee termination. If all leaders but one fail, Paxos is guaranteed to terminate, if we assume that messages are eventually delivered, but possibly out of order.</p>
-<p>In fact, under fairly weak assumptions about timing, Paxos can be made guaranteed to choose a proposal. We assume the clock drift of processes and message delivery delay are bounded. (We don’t need to know what those bounds are, but only that such bounds exist.) when a leader λ discovers (via a preempted message) that there is a higher ballot with leader λ’ active, rather than starting a new scout with an even higher ballot number, λ starts monitoring λ’ by pinging it on a regular basis. Only if λ’ stops responding, λ selects a higher ballot number and start a scount. For instance, the value of timeout interval can be chosen with a TCP-like additive increase, multiplicative decrease approach. If a ballot gets preempted, the value of the timeout interval is multiplied by some small factor larger than 1. With each chosen proposal, the timeout is decreased linearly.</p>
+<p>Paxos is no exception to the <a href="./2021-04-10-FLP.html">FLP impossibility result</a>, and Paxos does not guarantee termination. For instance, two leaders can preempt each other forever, causing livelock. However, f all leaders but one fail, Paxos is guaranteed to terminate, if we assume that messages are eventually delivered (but possibly out of order).</p>
+<p>Under fairly weak assumptions about timing, Paxos can be made guaranteed to choose a proposal. We assume the clock drift of processes and message delivery delay are bounded. (We don’t need to know what those bounds are, but only that such bounds exist.) When a leader λ discovers (via a preempted message) that there is a higher ballot with leader λ’ active, rather than starting a new scout with an even higher ballot number, λ starts monitoring λ’ by pinging it on a regular basis. Only if λ’ stops responding, λ selects a higher ballot number and starts a scout. The value of timeout interval can be chosen with a TCP-like additive increase, multiplicative decrease approach. If a ballot gets preempted, the value of the timeout interval is multiplied by some small factor larger than 1. With each chosen proposal, the timeout is decreased linearly.</p>
 <h4 id="leader-replica-colocation">Leader-replica colocation</h4>
-<p>In practice, each machine that runs a replica also runs a leader. When this is the case, the replica can send a proposal for a particular slot to its local leader, say λ, rather than broadcasting the request to all leaders. If λ is passive, monitoring another leader λ’, it forwards the proposal to λ’.</p>
+<p>In practice, each machine that runs a replica also runs a leader. When this is the case, the replica can send proposals to its local leader, say λ, rather than broadcasting the request to all leaders. If λ is passive, monitoring another leader λ’, it forwards the proposals to λ’.</p>
 <h4 id="references">References</h4>
 <p><a href="https://dl.acm.org/doi/10.1145/2673577">Paxos Made Moderately Complex (ACM Computing Surveys 2015)</a></p>
     </section>
