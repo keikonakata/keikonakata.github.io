@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title> Keiko Nakata - IronFleet - Proving Practical Distributed Systems Correct</title>
+  <link href="../css/default.css" type="text/css" rel="stylesheet" />
+</head>
+<body>
+        <header>
+            <nav>
+                <a href="../index.html">Home</a>
+                <a href="../archive.html">Archive</a>
+            </nav>
+        </header>
+
+        <main role="main">
+            <article>
+    <section class="header">
+        <h1>IronFleet - Proving Practical Distributed Systems Correct</h1>
+        Updated on 2021-08-03
+        
+    </section>
+    <section>
+        <p>IronFleet is a methodology for automated machine-checked verification in <a href="https://github.com/dafny-lang/dafny">Dafny</a> of the safety and liveness of distributed system implementations. It uses TLA-style state-machine refinement to reason about protocol-level concurrency, then use Floyd-Hoare style imperative verification to reason about implementation complexities.</p>
+<p>IronFleet organizes a distributed system’s implementation and proof into 3 layers: the high-level spec layer, the distributed-protocol layer and the implementation layer.</p>
+<p>To avoid complex reasoning about interleaved execution of low-level operations at multiple hosts, the proofs assume that every implementation step performs an atomic protocol step. Since the real implementation’s execution is not atomic, we use a <em>reduction</em> argument to show that a proof assuming atomicity is equally valid as a proof for the real system.</p>
+<p>All IronFleet code is publicly available at <a href="https://github.com/microsoft/Ironclad/blob/main/ironfleet/">GitHub</a>.</p>
+<h2 id="the-high-level-spec-layer">The high-level spec layer</h2>
+<p>The developer writes the system’s spec as a state machine. The spec consists of three predicate: <code>SpecInit</code> describes acceptable starting states, <code>SpecNext</code> describes acceptable ways to move from an old to a new state, and <code>SpecRelation</code> describes the required conditions on the relation between an implementation state and its corresponding abstract state.</p>
+<h2 id="the-distributed-protocol-layer">The distributed-protocol layer</h2>
+<p>The developer specifies a distributed system state machine, which consists of N host state machines and a collection of network packets. In each step of the execution, one host’s state machine takes a step, atomically reading messages from the network, updating its state and sending messages to the network. The atomicity greatly improves the proof that the protocol layer refines the spec layer.</p>
+<h3 id="connecting-the-protocol-layer-to-the-spec-layer">Connecting the protocol layer to the spec layer</h3>
+<p>The developer defines a refinement function <code>PRef</code> that takes a state of the protocol layer and returns the corresponding state of the spec layer. She proves that if a step of the protocol layer takes the state from <code>old</code> to <code>new</code>, then there exists a sequence of spec steps that goes from <code>PRef(old)</code> to <code>Pref(new)</code>.</p>
+<h2 id="the-implementation-layer">The Implementation Layer</h2>
+<p>The developer writes single-threaded imperative code to run on each host. She uses a ghost variable that records a “journal” of every network action, i.e., send and receive, that takes place.</p>
+<h3 id="connecting-the-implementation-layer-to-the-protocol-layer">Connecting the implementation layer to the protocol layer</h3>
+<p>We prove the implementation layer correctly refines the protocol layer. This is simplified by the fast that each step in the implementation layer corresponds to exactly one step of the protocol layer. Since the implementation’s event handler is not atomic (i.e., low-level operations by different machines may arbitrary interleave), we use a “reduction” argument to bridge the gap.</p>
+<h4 id="reduction">Reduction</h4>
+<p>Given a fine-grained behavior from a real concurrent system, we use reduction to convert it to an equivalent behavior of coarse-grained steps, simplifying verification. Two steps can swap places in the behavior if swapping them has no effect on the execution’s outcome. Applying reduction requires identifying all the steps of the system, proving commutativity relationships among them, and applying these relationships to create an equivalent behavior. We constrain the implementation to, in any given step, perform all of its receives before all its sends, to enable reduction. We moreover require that a step may perform at most one time-dependent operation, such as clock read, blocking receive and non-blocking receive that returns no packets. The step must perform all receives before this time-dependent operation, and all sends after it. (I wonder about the consequences of this requirement.)</p>
+<h2 id="verifying-liveness">Verifying Liveness</h2>
+<p>Liveness properties are much harder to verify than safety properties. Safety proofs need only reason about two system states at a time: if each step between two states preserves the system’s safety invariant. Liveness requires reasoning about infinite series of system states.</p>
+<p>IronFleet addresses the challenge via a custom TLA embedding in Dafny that focuses the prover’s efforts in a fruitful directions. We modified Dafny to better control how many times the SMT solver may expand a function’s definition and to make Dafny use triggers more cautiously.</p>
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://dl.acm.org/doi/10.1145/2815400.2815428">IronFleet: proving practical distributed systems correct (Symposium on Operating Systems Principles, 2015)</a></li>
+</ul>
+    </section>
+</article>
+
+        </main>
+
+        <footer>
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </footer>
+    </body>
+</html>
