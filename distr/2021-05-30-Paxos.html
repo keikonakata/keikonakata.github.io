@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title> Keiko Nakata - Paxos</title>
+  <title> Keiko Nakata - Paxos Made Moderately Complex</title>
   <link href="../css/default.css" type="text/css" rel="stylesheet" />
 </head>
 <body>
@@ -16,15 +16,16 @@
         <main role="main">
             <article>
     <section class="header">
-        <h1>Paxos</h1>
+        <h1>Paxos Made Moderately Complex</h1>
         Updated on 2021-08-20
         
     </section>
     <section>
         <p>Paxos is a distributed consensus protocol for deterministic state machine replication in an asynchronous environment (i.e., there are no bounds on timing) that admits crash failures.</p>
 <p>The discussion below is accompanied by my <a href="https://github.com/keikonakata/rustMisc/tree/master/paxos">reference implementation</a> in Rust.</p>
-<p>Paxos shines for its simplicity in correctness reasoning.</p>
+<p>Check out TLA+ specifications of Paxos protocols, e.g., <a href="https://github.com/tlaplus/Examples/tree/master/specifications/Paxos">Paxos</a>. It is interesting to observe how the algorithmic presentation of Paxos differ from the declarative TLA+ specification.</p>
 <h3 id="safety">Safety</h3>
+<p>Paxos shines for its simplicity in correctness reasoning.</p>
 <p>A replica may receive multiple decisions for the same slot. Paxos guarantees that, for any slot s, any decision for s received by any replica contains the same command. Namely, for ∀s: slot, ∀ρ1 ρ2: replica, and ∀c1 c2: command, if (s, c1) is in ρ1.decisions and (s, c2) is in ρ2.decisions, then c1 = c2.</p>
 <p>This follows from the following property of leaders. Suppose that for ∀α:acceptor among a majority of acceptors, (b, s, c) in α.accepted. Then, ∀b b’: ballot, if b’ &gt; b and a commander is spawned for (b’, s, c’) for some c’, then c = c’.</p>
 <p>To understand Paxos, we need to understand the proof of this property. It is proved by induction on b’.</p>
