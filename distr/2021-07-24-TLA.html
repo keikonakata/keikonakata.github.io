@@ -21,12 +21,19 @@
         
     </section>
     <section>
-        <p>TLA+ is a high-level language for modeling programs and systems, especially concurrent and distributed ones. TLA+ is particulary effective at revealing concurrency errors, ones that arise through the interaction of ascynchronous components. TLA+ comes with several tools, including</p>
+        <h3 id="citations">Citations</h3>
+<p><a href="https://lamport.azurewebsites.net/tla/tla.html">The TLA+ Home Page</a></p>
+<p><a href="https://lamport.azurewebsites.net/tla/book.html">Specifying Systems</a></p>
+<hr />
+<p>TLA+ is a high-level language for modeling programs and systems, especially concurrent and distributed ones. TLA+ is particulary effective at revealing concurrency errors, ones that arise through the interaction of ascynchronous components. TLA+ comes with several tools, including</p>
 <ul>
 <li>SANY Syntactic Analyzer (which checks syntactic correctness)</li>
 <li>TLC Model Checker</li>
 <li><a href="https://tla.msr-inria.inria.fr/tlaps/content/Home.html">TLAPS Proof System</a></li>
 </ul>
+<p><a href="https://marketplace.visualstudio.com/items?itemName=alygin.vscode-tlaplus">VS Code extension for TLA+</a></p>
+<p><a href="http://lamport.azurewebsites.net/video/videos.html">The TLA+ Video Course</a>. A quite good introduction to TLA+.</p>
+<p><a href="https://github.com/tlaplus/Examples">Examples</a></p>
 <h2 id="how-to-run">How to run</h2>
 <p>Download <code>tla2tools.jar</code> from <a href="https://github.com/tlaplus/tlaplus/releases">github</a>.</p>
 <p>Invoke the TLC model checker</p>
@@ -36,11 +43,14 @@
 <p>Translate PlusCal to TLA+</p>
 <pre><code>java -cp tla2tools.jar pcal.trans</code></pre>
 <h2 id="getting-started">Getting started</h2>
-<p>See <a href="https://github.com/keikonakata/tla/tree/main/channel">the Channel example</a>. Note that <code>THEOREM</code> statements are not checked by the TLC. They serve as a documentation.</p>
+<p>See <a href="https://github.com/keikonakata/tla/tree/main/channel">the Channel example</a>. Note that <code>THEOREM</code> statements are not checked by the TLC. They merely serve as a documentation.</p>
 <p>The input to TLC consists of a TLA+ module, a <code>.tla</code> file, and a configuration file, a <code>.cfg</code> file.</p>
-<p>The most important aspect of the level of abstraction is the grain of atomicity, the choice of what systm changes are represented as a single step of a behavior.</p>
-<h4 id="references">References</h4>
-<p><a href="https://lamport.azurewebsites.net/tla/tla.html">The TLA+ Home Page</a></p>
+<p>A module begins with four or more dashes (<code>-</code>), followed by zero or more space characters, followed by a keyword MODULE. A module ends with four or more equals (<code>=</code>). All characters that precede the beginning of a module is ignored. Four or more dashes are purely cosmetic and can be used as separators for readability.</p>
+<h2 id="notations">Notations</h2>
+<p><code>f.prof</code> is an abbreviation for <code>f["prof"]</code>.</p>
+<pre><code>[ f EXCEPT !.prof = &quot;Red&quot; ]
+UNCHANGED &lt;&lt;a,b,c&gt;&gt;
+INSTANCE TCommit</code></pre>
     </section>
 </article>
 
